@@ -1,0 +1,417 @@
+from __future__ import with_statement
+import pyttsx3
+import speech_recognition as sr
+import datetime
+import wikipedia
+import webbrowser
+import os
+import random
+import cv2
+import pywhatkit as kit
+import sys
+import pyautogui
+import time
+import operator
+import requests
+import pygetwindow as gw  # Import for window management
+
+# Initialize the text-to-speech engine
+engine = pyttsx3.init('sapi5')
+voices = engine.getProperty('voices')
+engine.setProperty('voice', voices[0].id)
+engine.setProperty('rate', 150)
+
+def speak(audio):
+    """Function to make the program speak a given text."""
+    engine.say(audio)
+    engine.runAndWait()
+
+def wishMe():
+    """Function to greet the user based on the current time."""
+    hour = int(datetime.datetime.now().hour)
+    if 0 <= hour < 12:
+        speak("Good Morning!")
+    elif 12 <= hour < 18:
+        speak("Good Afternoon!")
+    else:
+        speak("Good Evening!")
+
+    speak("Ready To Comply. What can I do for you?")
+
+def takeCommand():
+    """Function to take a voice command from the user."""
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        print("Listening...")
+        # Adjust for ambient noise and set energy threshold
+        r.adjust_for_ambient_noise(source, duration=1)
+        r.energy_threshold = 300  # Adjust this based on your environment
+        r.pause_threshold = 0.8
+        try:
+            audio = r.listen(source, timeout=5, phrase_time_limit=10)
+            print("Recognizing...")
+            query = r.recognize_google(audio, language='en-in')
+            print(f"User said: {query}\n")
+        except sr.WaitTimeoutError:
+            print("Listening timeout. Please try again.")
+            return "None"
+        except sr.UnknownValueError:
+            print("Could not understand audio. Please say that again.")
+            return "None"
+        except sr.RequestError as e:
+            print(f"Could not request results; {e}")
+            speak("Network error, please check your internet connection.")
+            return "None"
+    return query
+
+def maximize_window():
+    """Function to maximize the current active window."""
+    try:
+        window = gw.getActiveWindow()
+        if window is not None:
+            window.maximize()
+            speak("Window is maximized.")
+        else:
+            speak("No active window found.")
+    except Exception as e:
+        speak("Unable to maximize window.")
+        print(e)
+
+def minimize_window():
+    """Function to minimize the current active window."""
+    try:
+        window = gw.getActiveWindow()
+        if window is not None:
+            window.minimize()
+            speak("Window is minimized.")
+        else:
+            speak("No active window found.")
+    except Exception as e:
+        speak("Unable to minimize window.")
+        print(e)
+
+def restore_window():
+    """Function to restore the current minimized window."""
+    try:
+        window = gw.getActiveWindow()
+        if window is not None:
+            window.restore()
+            speak("Window is restored.")
+        else:
+            speak("No active window found.")
+    except Exception as e:
+        speak("Unable to restore window.")
+        print(e)
+        
+def remember_user_name():
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        speak("Please tell me your name.")
+        audio = r.listen(source, timeout=10, phrase_time_limit=10)
+        try:
+            user_name = r.recognize_google(audio, language='en-in')
+            speak(f"Hi {user_name}, I'll remember that.")
+            return user_name
+        except sr.UnknownValueError:
+            speak("Sorry, I didn't catch that. Could you please repeat?")
+            return "Unknown"
+        except sr.RequestError:
+            speak("Request error. Please try again.")
+            return "Unknown"
+
+if __name__ == "__main__":
+    wishMe()
+    while True:
+        query = takeCommand().lower()
+
+        # Check for the different commands
+        if 'wikipedia' in query:
+            speak('Searching Wikipedia...')
+            query = query.replace("wikipedia", "")
+            try:
+                results = wikipedia.summary(query, sentences=2)
+                speak("According to Wikipedia")
+                print(results)
+                speak(results)
+            except wikipedia.exceptions.DisambiguationError as e:
+                print(f"Disambiguation Error: {e.options}")
+                speak("There are multiple results. Can you please be more specific?")
+            except wikipedia.exceptions.PageError:
+                print("Page not found on Wikipedia.")
+                speak("I couldn't find anything on Wikipedia. Please try again.")
+
+        elif 'search on youtube' in query:
+            query = query.replace("search on youtube", "")
+            webbrowser.open(f"www.youtube.com/results?search_query={query}")
+            speak(f"Searching for {query} on YouTube.")
+
+        elif 'open youtube' in query:
+            speak("What would you like to watch?")
+            qrry = takeCommand().lower()
+            if qrry != "none":
+                kit.playonyt(f"{qrry}")
+                speak(f"Playing {qrry} on YouTube.")
+
+        elif 'close chrome' in query:
+            os.system("taskkill /f /im chrome.exe")
+            speak("Chrome is now closed.")
+
+        elif 'close youtube' in query:
+            os.system("taskkill /f /im msedge.exe")
+            speak("YouTube is now closed.")
+
+        elif 'open google' in query:
+            speak("What should I search?")
+            qry = takeCommand().lower()
+            if qry != "none":
+                webbrowser.open(f"https://www.google.com/search?q={qry}")
+                speak(f"Searching for {qry} on Google.")
+                try:
+                    results = wikipedia.summary(qry, sentences=2)
+                    speak(results)
+                except wikipedia.exceptions.PageError:
+                    print("No Wikipedia page found.")
+                except Exception as e:
+                    print(e)
+
+        elif 'close google' in query:
+            os.system("taskkill /f /im msedge.exe")
+            speak("Google is now closed.")
+
+        elif 'play music' in query:
+            music_dir = 'C:\\Users\\YourUsername\\Music'  # Update this path to your music directory
+            songs = os.listdir(music_dir)
+            if songs:
+                song = random.choice(songs)
+                os.startfile(os.path.join(music_dir, song))
+                speak(f"Playing {song}.")
+            else:
+                speak("No music files found in the directory.")
+
+        elif 'play movie' in query:
+            movie_path = 'C:\\Users\\YourUsername\\Videos\\Movie.mkv'  # Update this path to your movie file
+            if os.path.exists(movie_path):
+                os.startfile(movie_path)
+                speak("Playing movie.")
+            else:
+                speak("I couldn't find the movie file. Please check the path.")
+
+        elif 'close movie' in query:
+            os.system("taskkill /f /im vlc.exe")
+            speak("Movie is now closed.")
+
+        elif 'close music' in query:
+            os.system("taskkill /f /im vlc.exe")
+            speak("Music is now stopped.")
+
+        elif 'what is the time' in query:
+            strTime = datetime.datetime.now().strftime("%H:%M:%S")
+            speak(f"The time is {strTime}")
+
+        elif "shut down the system" in query:
+            speak("Shutting down the system.")
+            os.system("shutdown /s /t 5")
+
+        elif "restart the system" in query:
+            speak("Restarting the system.")
+            os.system("shutdown /r /t 5")
+
+        elif "lock the system" in query:
+            speak("Locking the system.")
+            os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
+
+        elif "close notepad" in query:
+            os.system("taskkill /f /im notepad.exe")
+            speak("Notepad is now closed.")
+
+        elif "open command prompt" in query:
+            os.system("start cmd")
+            speak("Command prompt is now open.")
+
+        elif "close command prompt" in query:
+            os.system("taskkill /f /im cmd.exe")
+            speak("Command prompt is now closed.")
+
+        elif "open camera" in query:
+            cap = cv2.VideoCapture(0)
+            speak("Opening camera.")
+            while True:
+                ret, img = cap.read()
+                cv2.imshow('webcam', img)
+                k = cv2.waitKey(50)
+                if k == 27:
+                    break
+            cap.release()
+            cv2.destroyAllWindows()
+            speak("Camera is now closed.")
+
+        elif "go to sleep" in query:
+            speak("Alright then, I am switching off.")
+            sys.exit()
+
+        elif "take screenshot" in query:
+            speak("Tell me a name for the file.")
+            name = takeCommand().lower()
+            if name != "none":
+                time.sleep(3)
+                img = pyautogui.screenshot()
+                img.save(f"{name}.png")
+                speak(f"Screenshot saved as {name}.png.")
+
+        elif "calculate" in query:
+            r = sr.Recognizer()
+            with sr.Microphone() as source:
+                speak("Ready")
+                print("Listening...")
+                r.adjust_for_ambient_noise(source)
+                audio = r.listen(source)
+                try:
+                    my_string = r.recognize_google(audio)
+                    print(my_string)
+                except sr.UnknownValueError:
+                    speak("Could not understand the calculation. Please try again.")
+                    continue
+                except sr.RequestError:
+                    speak("Request error. Please try again.")
+                    continue
+
+            def get_operator_fn(op):
+                return {
+                    '+': operator.add,
+                    '-': operator.sub,
+                    'x': operator.mul,
+                    'divided': operator.__truediv__,
+                }.get(op)
+
+            def eval_binary_expr(op1, oper, op2):
+                op1, op2 = int(op1), int(op2)
+                fn = get_operator_fn(oper)
+                if fn:
+                    return fn(op1, op2)
+                else:
+                    speak("Invalid operator.")
+                    return None
+
+            result = eval_binary_expr(*(my_string.split()))
+            if result is not None:
+                speak("Your result is")
+                speak(result)
+
+        elif "what is my ip address" in query:
+            speak("Checking.")
+            try:
+                ipAdd = requests.get('https://api.ipify.org').text
+                print(ipAdd)
+                speak("Your IP address is")
+                speak(ipAdd)
+            except requests.exceptions.RequestException:
+                speak("Network is weak, please try again later")
+
+        elif "volume up" in query:
+            for _ in range(5):  # Adjust volume by 5 steps
+                pyautogui.press("volumeup")
+            speak("Volume is increased.")
+
+        elif "volume down" in query:
+            for _ in range(5):
+                pyautogui.press("volumedown")
+            speak("Volume is decreased.")
+
+        elif "mute" in query:
+            pyautogui.press("volumemute")
+            speak("Volume is muted.")
+
+        elif "refresh" in query:
+            pyautogui.hotkey('ctrl', 'r')
+            speak("Page is refreshed.")
+
+        elif "open settings" in query:
+            pyautogui.hotkey('win', 'i')
+            speak("Settings are now open.")
+
+        elif "open start" in query:
+            pyautogui.hotkey('win')
+            speak("Start menu is now open.")
+
+        elif "open task manager" in query:
+            pyautogui.hotkey('ctrl', 'shift', 'esc')
+            speak("Task manager is now open.")
+
+        elif "open snipping tool" in query:
+            pyautogui.hotkey('win', 'shift', 's')
+            speak("Snipping tool is now open.")
+
+        elif "switch between apps" in query:
+            pyautogui.hotkey('alt', 'tab')
+            speak("Switching between applications.")
+
+        elif "open file explorer" in query:
+            pyautogui.hotkey('win', 'e')
+            speak("File explorer is now open.")
+
+        elif "maximise window" in query:
+            maximize_window()
+
+        elif "minimise window" in query:
+            minimize_window()
+
+        elif "restore window" in query:
+            restore_window()
+
+        # New commands to open applications
+        elif "open whatsapp" in query:
+            whatsapp_path = "C:\\Users\\YourUsername\\AppData\\Local\\WhatsApp\\WhatsApp.exe"  # Update this path
+            if os.path.exists(whatsapp_path):
+                os.startfile(whatsapp_path)
+                speak("WhatsApp is now open.")
+            else:
+                speak("WhatsApp is not installed on your system or the path is incorrect.")
+
+        elif "open instagram" in query:
+            webbrowser.open("https://www.instagram.com/")
+            speak("Instagram is now open.")
+
+        elif "open chatgpt" in query:
+            webbrowser.open("https://chatgpt.com/?model=auto")
+            speak("ChatGPT is now open.")
+
+        elif "open spotify" in query:
+            spotify_path = "C:\Program Files\WindowsApps\SpotifyAB.SpotifyMusic_1.242.290.0_x64__zpdnekdrzrea0"  # Update this path
+            if os.path.exists(spotify_path):
+                os.startfile(spotify_path)
+                speak("Spotify is now open.")
+            else:
+                speak("Spotify is not installed on your system or the path is incorrect.")
+
+        # Additional closing commands
+        elif "close whatsapp" in query:
+            os.system("taskkill /f /im WhatsApp.exe")
+            speak("WhatsApp is now closed.")
+
+        elif "close instagram" in query:
+            os.system("taskkill /f /im msedge.exe")  # Assuming Instagram is opened in Edge
+            speak("Instagram is now closed.")
+
+        elif "close chatgpt" in query:
+            os.system("taskkill /f /im msedge.exe")  # Assuming ChatGPT is opened in Edge
+            speak("ChatGPT is now closed.")
+
+        elif "close spotify" in query:
+            os.system("taskkill /f /im Spotify.exe")
+            speak("Spotify is now closed.")
+            
+        elif "what is your name" in query:
+            speak("Hi, my name is Jarvis. What is your name?")
+            user_name = remember_user_name()
+            if user_name != "Unknown":
+                speak(f"Hi {user_name}, I'll remember that.")
+
+        elif "who created you" in query:
+            speak("I was created by Mr. Bharat Vanapalli.")
+
+        elif "say hello to my friends" in query:
+            speak("Hello everyone, my name is Jarvis.")
+
+        elif 'exit' in query or 'quit' in query:
+            speak("Goodbye!")
+            sys.exit()
